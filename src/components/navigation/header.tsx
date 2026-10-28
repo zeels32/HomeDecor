@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
@@ -24,7 +24,6 @@ import { useWishlist } from '@/features/wishlist/wishlist-context';
 import { useAuth } from '@/features/auth/auth-context';
 import { createClient } from '@/lib/supabase/client';
 import { Category } from '@/types';
-import { useMemo } from 'react';
 import { SearchModal } from './search-modal';
 
 interface SubCategory {
@@ -44,11 +43,91 @@ interface NavCategory {
   featuredSubtitle?: string;
 }
 
+// Pre-configured rich mega menu settings for core signature collections
+const knownMegaCategories: Record<string, Partial<NavCategory>> = {
+  'flower-pots': {
+    name: 'Flower Pots',
+    href: '/collections/flower-pots',
+    hasMega: true,
+    subcategories: [
+      {
+        name: 'Ceramic Planters',
+        href: '/shop?category=flower-pots&material=ceramic',
+        description: 'High-fired stoneware with matte glazes',
+      },
+      {
+        name: 'Terracotta Pots',
+        href: '/shop?category=flower-pots&material=terracotta',
+        description: 'Breathable porous natural earthenware',
+      },
+      {
+        name: 'Indoor Ribbed Pots',
+        href: '/shop?category=flower-pots',
+        description: 'Textured architectural silhouettes',
+      },
+    ],
+    featuredImage:
+      'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=600&q=80',
+    featuredTitle: 'Living Botanical Collection',
+    featuredSubtitle: 'Hand-thrown earthen pottery for healthy plants',
+  },
+  'flower-vases': {
+    name: 'Flower Vases',
+    href: '/collections/flower-vases',
+    hasMega: true,
+    subcategories: [
+      {
+        name: 'Sculptural Ceramic Vases',
+        href: '/shop?category=flower-vases&material=ceramic',
+        description: 'Organic undulating curves & raw textures',
+      },
+      {
+        name: 'Mouth-Blown Glass Vases',
+        href: '/shop?category=flower-vases&material=glass',
+        description: 'Warm amber, smoke, and olive tones',
+      },
+      {
+        name: 'Minimalist Bud Vases',
+        href: '/shop?category=flower-vases',
+        description: 'Intimate single-stem display pieces',
+      },
+    ],
+    featuredImage:
+      'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=600&q=80',
+    featuredTitle: 'Artisanal Vessel Edit',
+    featuredSubtitle: 'Quiet architectural accents for fresh blooms',
+  },
+};
+
+const defaultCollectionsList: NavCategory[] = [
+  {
+    name: 'Flower Pots',
+    href: '/collections/flower-pots',
+    hasMega: true,
+    subcategories: knownMegaCategories['flower-pots'].subcategories,
+    featuredImage: knownMegaCategories['flower-pots'].featuredImage,
+    featuredTitle: knownMegaCategories['flower-pots'].featuredTitle,
+    featuredSubtitle: knownMegaCategories['flower-pots'].featuredSubtitle,
+  },
+  {
+    name: 'Flower Vases',
+    href: '/collections/flower-vases',
+    hasMega: true,
+    subcategories: knownMegaCategories['flower-vases'].subcategories,
+    featuredImage: knownMegaCategories['flower-vases'].featuredImage,
+    featuredTitle: knownMegaCategories['flower-vases'].featuredTitle,
+    featuredSubtitle: knownMegaCategories['flower-vases'].featuredSubtitle,
+  },
+  { name: 'Tabletop Decor', href: '/collections/tabletop-decor' },
+  { name: 'Living Room', href: '/collections/living-room' },
+  { name: 'Office Decor', href: '/collections/office-decor' },
+];
+
 export function Header() {
   const pathname = usePathname();
   const { itemCount, openDrawer } = useCart();
   const { wishlistCount } = useWishlist();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -59,6 +138,7 @@ export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [dbCategories, setDbCategories] = useState<Category[]>([]);
 
+  // Fetch active categories from Supabase on mount and route changes
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
@@ -69,22 +149,48 @@ export function Header() {
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .then(({ data }) => {
-        if (data) {
+        if (data && data.length > 0) {
           setDbCategories(data as Category[]);
         }
       });
   }, [pathname]);
 
-  const extraCategories = useMemo(() => {
-    const defaultSlugs = new Set([
-      'flower-pots',
-      'flower-vases',
-      'tabletop-decor',
-      'living-room',
-      'office-decor',
-    ]);
-    return dbCategories.filter((cat) => !defaultSlugs.has(cat.slug));
+  // Construct complete collection items merging dynamic categories with rich mega menu data
+  const allCollections: NavCategory[] = useMemo(() => {
+    if (!dbCategories || dbCategories.length === 0) {
+      return defaultCollectionsList;
+    }
+
+    return dbCategories.map((cat) => {
+      const mega = knownMegaCategories[cat.slug];
+      if (mega) {
+        return {
+          name: cat.name.replace(/ & Planters$/, ''),
+          href: `/collections/${cat.slug}`,
+          hasMega: true,
+          subcategories: mega.subcategories,
+          featuredImage: mega.featuredImage || cat.image_url || undefined,
+          featuredTitle: mega.featuredTitle,
+          featuredSubtitle: mega.featuredSubtitle,
+        };
+      }
+
+      return {
+        name: cat.name,
+        href: `/collections/${cat.slug}`,
+      };
+    });
   }, [dbCategories]);
+
+  // Strictly limit visible collections in the menu bar to at most 5:
+  const visibleCollections = useMemo(() => {
+    return allCollections.slice(0, 5);
+  }, [allCollections]);
+
+  // Remaining collections (from index 5 onwards) will be shown inside "More":
+  const remainingCollections = useMemo(() => {
+    return allCollections.slice(5);
+  }, [allCollections]);
 
   // Close menus on route change
   useEffect(() => {
@@ -132,66 +238,6 @@ export function Header() {
       [name]: !prev[name],
     }));
   }, []);
-
-  const navCategories: NavCategory[] = [
-    { name: 'Shop All', href: '/shop' },
-    {
-      name: 'Flower Pots',
-      href: '/collections/flower-pots',
-      hasMega: true,
-      subcategories: [
-        {
-          name: 'Ceramic Planters',
-          href: '/shop?category=flower-pots&material=ceramic',
-          description: 'High-fired stoneware with matte glazes',
-        },
-        {
-          name: 'Terracotta Pots',
-          href: '/shop?category=flower-pots&material=terracotta',
-          description: 'Breathable porous natural earthenware',
-        },
-        {
-          name: 'Indoor Ribbed Pots',
-          href: '/shop?category=flower-pots',
-          description: 'Textured architectural silhouettes',
-        },
-      ],
-      featuredImage:
-        'https://images.unsplash.com/photo-1485955900006-10f4d324d411?auto=format&fit=crop&w=600&q=80',
-      featuredTitle: 'Living Botanical Collection',
-      featuredSubtitle: 'Hand-thrown earthen pottery for healthy plants',
-    },
-    {
-      name: 'Flower Vases',
-      href: '/collections/flower-vases',
-      hasMega: true,
-      subcategories: [
-        {
-          name: 'Sculptural Ceramic Vases',
-          href: '/shop?category=flower-vases&material=ceramic',
-          description: 'Organic undulating curves & raw textures',
-        },
-        {
-          name: 'Mouth-Blown Glass Vases',
-          href: '/shop?category=flower-vases&material=glass',
-          description: 'Warm amber, smoke, and olive tones',
-        },
-        {
-          name: 'Minimalist Bud Vases',
-          href: '/shop?category=flower-vases',
-          description: 'Intimate single-stem display pieces',
-        },
-      ],
-      featuredImage:
-        'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=600&q=80',
-      featuredTitle: 'Artisanal Vessel Edit',
-      featuredSubtitle: 'Quiet architectural accents for fresh blooms',
-    },
-    { name: 'Tabletop Decor', href: '/collections/tabletop-decor' },
-    { name: 'Living Room', href: '/collections/living-room' },
-    { name: 'Office Decor', href: '/collections/office-decor' },
-    { name: 'New Arrivals', href: '/shop?sort=newest', highlight: true },
-  ];
 
   return (
     <>
@@ -243,8 +289,8 @@ export function Header() {
               </button>
             </div>
 
-            {/* Brand Logo - Centered on Mobile/Tablet, Left-aligned on Desktop/Laptop */}
-            <div className="flex-1 lg:flex-none flex items-center justify-center lg:justify-start">
+            {/* Brand Logo - Left-aligned on desktop, flex-shrink-0 so it never collapses */}
+            <div className="flex-1 lg:flex-none flex-shrink-0 flex items-center justify-center lg:justify-start">
               <Link
                 href="/"
                 className="group flex flex-col items-center lg:items-start text-center lg:text-left py-1"
@@ -258,12 +304,27 @@ export function Header() {
               </Link>
             </div>
 
-            {/* Desktop / Laptop Navigation Bar */}
-            <nav className="hidden lg:flex items-center justify-center flex-1 lg:gap-3 xl:gap-5 2xl:gap-7 px-2">
-              {navCategories.map((item) => (
+            {/* Desktop / Laptop Navigation Bar (Bounded width and gap so right icons never overflow) */}
+            <nav className="hidden lg:flex items-center justify-center flex-1 min-w-0 lg:gap-2 xl:gap-3.5 2xl:gap-5 px-1 xl:px-2">
+              {/* Shop All */}
+              <div className="relative py-6 xl:py-7 flex-shrink-0">
+                <Link
+                  href="/shop"
+                  className={`text-[11px] xl:text-[12px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 ${
+                    pathname === '/shop'
+                      ? 'text-forest font-semibold border-b-2 border-forest -mb-0.5'
+                      : 'text-charcoal hover:text-forest'
+                  }`}
+                >
+                  <span>Shop All</span>
+                </Link>
+              </div>
+
+              {/* Up to 5 Collections */}
+              {visibleCollections.map((item) => (
                 <div
                   key={item.name}
-                  className="relative py-6 xl:py-7 group"
+                  className="relative py-6 xl:py-7 group flex-shrink-0"
                   onMouseEnter={() => item.hasMega && setActiveMegaDropdown(item.name)}
                   onMouseLeave={() => setActiveMegaDropdown(null)}
                   onFocus={() => item.hasMega && setActiveMegaDropdown(item.name)}
@@ -275,10 +336,8 @@ export function Header() {
                 >
                   <Link
                     href={item.href}
-                    className={`text-[11.5px] xl:text-[12.5px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 ${
-                      item.highlight
-                        ? 'text-forest font-semibold'
-                        : pathname === item.href
+                    className={`text-[11px] xl:text-[12px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 ${
+                      pathname === item.href
                         ? 'text-forest font-semibold border-b-2 border-forest -mb-0.5'
                         : 'text-charcoal hover:text-forest'
                     }`}
@@ -365,48 +424,103 @@ export function Header() {
                 </div>
               ))}
 
-              {extraCategories.length > 0 && (
-                <div
-                  className="relative py-6 xl:py-7 group"
-                  onMouseEnter={() => setActiveMegaDropdown('More Collections')}
-                  onMouseLeave={() => setActiveMegaDropdown(null)}
+              {/* More Dropdown: Shows remaining collections & New Arrivals */}
+              <div
+                className="relative py-6 xl:py-7 group flex-shrink-0"
+                onMouseEnter={() => setActiveMegaDropdown('more-collections')}
+                onMouseLeave={() => setActiveMegaDropdown(null)}
+                onFocus={() => setActiveMegaDropdown('more-collections')}
+                onBlur={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget)) {
+                    setActiveMegaDropdown(null);
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  className={`text-[11px] xl:text-[12px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 ${
+                    activeMegaDropdown === 'more-collections' ||
+                    remainingCollections.some((c) => pathname === c.href)
+                      ? 'text-forest font-semibold'
+                      : 'text-charcoal hover:text-forest'
+                  }`}
                 >
-                  <button
-                    type="button"
-                    className="text-[11.5px] xl:text-[12.5px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 text-charcoal hover:text-forest"
-                  >
-                    <span>More</span>
-                    <ChevronDown
-                      className={`w-3 h-3 text-muted-gray transition-transform duration-200 ${
-                        activeMegaDropdown === 'More Collections' ? 'rotate-180 text-forest' : ''
-                      }`}
-                    />
-                  </button>
+                  <span>More</span>
+                  <ChevronDown
+                    className={`w-3 h-3 text-muted-gray transition-transform duration-200 ${
+                      activeMegaDropdown === 'more-collections' ? 'rotate-180 text-forest' : ''
+                    }`}
+                  />
+                </button>
 
-                  {activeMegaDropdown === 'More Collections' && (
-                    <div className="absolute top-full right-0 w-52 bg-white border border-subtle-border shadow-elevated rounded-sm p-2.5 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-gray px-2 pb-1.5 border-b border-subtle-border">
+                {activeMegaDropdown === 'more-collections' && (
+                  <div
+                    className="absolute top-full right-0 w-64 bg-white border border-subtle-border shadow-elevated rounded-sm p-3.5 z-50 animate-in fade-in slide-in-from-top-1 duration-200"
+                    role="menu"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-subtle-border mb-1.5">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-gray">
                         More Collections
-                      </p>
-                      <div className="py-1 space-y-0.5">
-                        {extraCategories.map((cat) => (
-                          <Link
-                            key={cat.id}
-                            href={`/collections/${cat.slug}`}
-                            className="block px-2 py-1.5 text-xs text-charcoal hover:text-forest hover:bg-sand/30 rounded-xs transition-colors"
-                          >
-                            {cat.name}
-                          </Link>
-                        ))}
-                      </div>
+                      </span>
+                      {remainingCollections.length > 0 && (
+                        <span className="text-[10px] font-mono text-muted-gray bg-sand-100 px-1.5 py-0.5 rounded">
+                          {remainingCollections.length} more
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+
+                    <div className="space-y-0.5 max-h-64 overflow-y-auto pr-1">
+                      {remainingCollections.length > 0 ? (
+                        remainingCollections.map((col) => (
+                          <Link
+                            key={col.href}
+                            href={col.href}
+                            className={`flex items-center justify-between px-2.5 py-1.5 text-xs rounded-xs transition-colors ${
+                              pathname === col.href
+                                ? 'text-forest font-semibold bg-forest/5'
+                                : 'text-charcoal hover:text-forest hover:bg-sand/30 font-medium'
+                            }`}
+                          >
+                            <span>{col.name}</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-muted-gray" />
+                          </Link>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-gray py-2 px-1 italic">
+                          Explore our full curated catalog
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-2 mt-2 border-t border-subtle-border space-y-1">
+                      <Link
+                        href="/shop?sort=newest"
+                        className="flex items-center justify-between px-2.5 py-1.5 text-xs text-forest hover:bg-forest/5 rounded-xs font-semibold transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-forest" />
+                          <span>New Arrivals</span>
+                        </div>
+                        <span className="text-[9px] font-mono uppercase bg-forest text-white px-1.5 py-0.5 rounded-full font-bold">
+                          New
+                        </span>
+                      </Link>
+
+                      <Link
+                        href="/shop"
+                        className="block px-2.5 py-1 text-[11px] text-muted-gray hover:text-charcoal transition-colors font-medium text-center"
+                      >
+                        Browse All Categories →
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             </nav>
 
             {/* Right Action Icons: Search (Desktop), Account, Wishlist, Cart */}
-            <div className="flex items-center space-x-1 sm:space-x-1.5 lg:space-x-2 flex-shrink-0">
+            {/* flex-shrink-0 and z-10 ensures it is ALWAYS visible and never pushed off-screen */}
+            <div className="flex items-center space-x-1 sm:space-x-1.5 lg:space-x-2 flex-shrink-0 z-10">
               {/* Search Icon (Desktop only, as mobile has it in left group) */}
               <button
                 type="button"
@@ -544,7 +658,24 @@ export function Header() {
                     Collections & Catalog
                   </p>
 
-                  {navCategories.map((item) => {
+                  {/* Shop All */}
+                  <div className="border-b border-subtle-border/60 pb-1">
+                    <Link
+                      href="/shop"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center justify-between py-2.5 px-2 text-sm sm:text-base font-serif font-medium transition-colors rounded-xs ${
+                        pathname === '/shop'
+                          ? 'text-forest font-semibold bg-forest/5'
+                          : 'text-charcoal hover:text-forest hover:bg-sand/30'
+                      }`}
+                    >
+                      <span>Shop All</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-gray" />
+                    </Link>
+                  </div>
+
+                  {/* All Collections (with accordions for subcategories) */}
+                  {allCollections.map((item) => {
                     const isExpanded = !!expandedMobileCategories[item.name];
                     const hasSub = !!item.subcategories?.length;
 
@@ -622,36 +753,29 @@ export function Header() {
                             }`}
                           >
                             <span>{item.name}</span>
-                            {item.highlight && (
-                              <span className="text-[10px] font-mono uppercase bg-forest text-white px-2 py-0.5 rounded-full font-semibold">
-                                New
-                              </span>
-                            )}
+                            <ArrowRight className="w-3.5 h-3.5 text-muted-gray" />
                           </Link>
                         )}
                       </div>
                     );
                   })}
 
-                  {/* Dynamic Extra Categories from Admin */}
-                  {extraCategories.length > 0 && (
-                    <div className="pt-2 border-t border-subtle-border/60 space-y-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-gray px-1 pb-1">
-                        More Collections
-                      </p>
-                      {extraCategories.map((cat) => (
-                        <Link
-                          key={cat.id}
-                          href={`/collections/${cat.slug}`}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center justify-between py-2 px-2 text-sm font-serif font-medium text-charcoal hover:text-forest hover:bg-sand/30 rounded-xs transition-colors"
-                        >
-                          <span>{cat.name}</span>
-                          <ArrowRight className="w-3.5 h-3.5 text-muted-gray" />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
+                  {/* New Arrivals */}
+                  <div className="pt-2">
+                    <Link
+                      href="/shop?sort=newest"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center justify-between py-2.5 px-2 text-sm sm:text-base font-serif font-medium text-charcoal hover:text-forest hover:bg-sand/30 transition-colors rounded-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-forest" />
+                        <span>New Arrivals</span>
+                      </div>
+                      <span className="text-[10px] font-mono uppercase bg-forest text-white px-2 py-0.5 rounded-full font-semibold">
+                        New
+                      </span>
+                    </Link>
+                  </div>
                 </div>
 
                 {/* Featured Editorial Card */}
@@ -668,165 +792,91 @@ export function Header() {
                     <span className="text-[10px] font-mono uppercase tracking-widest text-sage-200">
                       Curated Sanctuary
                     </span>
-                    <h4 className="font-serif text-sm font-medium leading-tight">
-                      Hand-thrown stoneware & mouth-blown glass
-                    </h4>
-                    <Link
-                      href="/shop"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-sage-100 hover:text-white pt-1"
-                    >
-                      <span>Explore artisanal catalog</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </Link>
+                    <p className="font-serif text-base font-medium">Quiet architectural accents</p>
+                    <p className="text-[11px] text-ivory/80 line-clamp-2">
+                      Handcrafted earthenware designed to elevate daily spaces with natural warmth.
+                    </p>
                   </div>
                 </div>
 
-                {/* Customer Account & Personnel Section */}
-                <div className="pt-2 border-t border-subtle-border">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-gray px-1 pb-2">
-                    Account & Orders
-                  </p>
-
-                  {user ? (
-                    <div className="bg-white p-3.5 rounded-sm border border-subtle-border space-y-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-9 h-9 rounded-full bg-forest text-white font-serif font-medium flex items-center justify-center text-sm">
-                          {(profile?.full_name || user.email || 'U')[0].toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-charcoal truncate">
-                            {profile?.full_name || 'Valued Collector'}
-                          </p>
-                          <p className="text-[11px] text-muted-gray truncate">
-                            {user.email}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-subtle-border/60 text-xs">
-                        <Link
-                          href="/account/orders"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center space-x-1.5 p-2 rounded hover:bg-sand-50 text-charcoal hover:text-forest transition-colors font-medium"
-                        >
-                          <Package className="w-3.5 h-3.5 text-muted-gray" />
-                          <span>Orders</span>
-                        </Link>
-                        <Link
-                          href="/account"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center space-x-1.5 p-2 rounded hover:bg-sand-50 text-charcoal hover:text-forest transition-colors font-medium"
-                        >
-                          <User className="w-3.5 h-3.5 text-muted-gray" />
-                          <span>Profile</span>
-                        </Link>
-                      </div>
-
-                      {profile?.is_admin && (
-                        <Link
-                          href="/admin"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center justify-between p-2.5 bg-forest-50 border border-forest-200 rounded-xs text-xs font-semibold text-forest hover:bg-forest-100 transition-colors"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <ShieldCheck className="w-4 h-4 text-forest" />
-                            <span>Staff Backoffice Portal</span>
-                          </div>
-                          <span className="w-2 h-2 rounded-full bg-forest animate-pulse" />
-                        </Link>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await signOut();
-                          setIsMobileMenuOpen(false);
-                        }}
-                        className="w-full flex items-center justify-center space-x-1.5 py-1.5 text-xs text-red-700 hover:text-red-900 transition-colors pt-2 border-t border-subtle-border/50"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="bg-white p-3.5 rounded-sm border border-subtle-border space-y-2.5">
-                      <p className="text-xs text-muted-gray">
-                        Sign in to track orders, manage addresses, and save curated wishlists.
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Link
-                          href="/login"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center justify-center py-2 px-3 bg-forest text-white rounded-xs text-xs font-semibold hover:bg-forest-600 transition-colors"
-                        >
-                          Sign In
-                        </Link>
-                        <Link
-                          href="/register"
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className="flex items-center justify-center py-2 px-3 border border-subtle-border text-charcoal rounded-xs text-xs font-semibold hover:bg-sand-50 transition-colors"
-                        >
-                          Register
-                        </Link>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Concierge & Support Links */}
-                <div className="pt-2 border-t border-subtle-border space-y-2 text-xs">
+                {/* Secondary Customer Utilities inside Drawer */}
+                <div className="pt-2 border-t border-subtle-border/70 space-y-1 text-xs">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-gray px-1 pb-1">
-                    Atelier Concierge
+                    Account & Concierge
                   </p>
+
                   <Link
-                    href="/about"
+                    href={user ? '/account' : '/login'}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-1 px-1 text-charcoal hover:text-forest transition-colors"
+                    className="flex items-center justify-between py-2 px-2 rounded-xs text-charcoal hover:bg-sand/40 transition-colors"
                   >
-                    Our Brand Story & Craftsmanship
+                    <div className="flex items-center space-x-2.5">
+                      <User className="w-4 h-4 text-forest" />
+                      <span>{user ? 'My Profile & Orders' : 'Sign in to Account'}</span>
+                    </div>
+                    {user && (
+                      <span className="text-[10px] bg-forest/10 text-forest px-2 py-0.5 rounded-full font-medium">
+                        Active
+                      </span>
+                    )}
                   </Link>
+
+                  <Link
+                    href="/wishlist"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center justify-between py-2 px-2 rounded-xs text-charcoal hover:bg-sand/40 transition-colors"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <Heart className="w-4 h-4 text-forest" />
+                      <span>Saved Wishlist</span>
+                    </div>
+                    {wishlistCount > 0 && (
+                      <span className="text-[10px] bg-sage-500 text-white px-2 py-0.5 rounded-full font-bold">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </Link>
+
+                  {profile?.is_admin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center justify-between py-2 px-2 rounded-xs text-forest font-semibold bg-forest/5 hover:bg-forest/10 transition-colors"
+                    >
+                      <div className="flex items-center space-x-2.5">
+                        <ShieldCheck className="w-4 h-4 text-forest" />
+                        <span>Staff Administration</span>
+                      </div>
+                      <span className="text-[9px] uppercase tracking-wider bg-forest text-white px-2 py-0.5 rounded">
+                        Admin
+                      </span>
+                    </Link>
+                  )}
+
                   <Link
                     href="/contact"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-1 px-1 text-charcoal hover:text-forest transition-colors"
+                    className="flex items-center justify-between py-2 px-2 rounded-xs text-charcoal hover:bg-sand/40 transition-colors"
                   >
-                    Concierge & Interior Inquiries
-                  </Link>
-                  <Link
-                    href="/shipping-policy"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-1 px-1 text-charcoal hover:text-forest transition-colors"
-                  >
-                    Insured Shipping Guidelines
-                  </Link>
-                  <Link
-                    href="/faq"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-1 px-1 text-charcoal hover:text-forest transition-colors"
-                  >
-                    Frequently Asked Questions
+                    <div className="flex items-center space-x-2.5">
+                      <Package className="w-4 h-4 text-forest" />
+                      <span>Care & Shipping Support</span>
+                    </div>
                   </Link>
                 </div>
               </div>
 
-              {/* Drawer Footer Notice */}
-              <div className="p-3.5 sm:p-4 border-t border-subtle-border bg-white text-center space-y-1">
-                <p className="text-[11px] text-forest font-medium flex items-center justify-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-sage-400" />
-                  <span>Complimentary shipping over ₹2,999</span>
-                </p>
-                <p className="text-[10px] text-muted-gray">
-                  © {new Date().getFullYear()} TERRA & FORM Atelier. All rights reserved.
-                </p>
+              {/* Drawer Footer Status */}
+              <div className="p-4 border-t border-subtle-border bg-white text-[11px] text-muted-gray flex items-center justify-between">
+                <span>Pan-India Delivery</span>
+                <span className="font-mono text-forest font-medium">Over ₹2,999 Free</span>
               </div>
-
             </div>
           </div>
         </div>
       )}
 
-      {/* 4. Search Modal */}
+      {/* Global Interactive Search Modal */}
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
     </>
   );

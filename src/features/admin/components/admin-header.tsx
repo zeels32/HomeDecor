@@ -31,26 +31,26 @@ export function AdminHeader({ onToggleMobileMenu }: AdminHeaderProps) {
     <header className="sticky top-0 z-30 bg-charcoal text-white border-b border-charcoal-light shadow-soft">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Left: Mobile trigger & Page title */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
           <button
             onClick={onToggleMobileMenu}
-            className="lg:hidden p-1.5 text-ivory/80 hover:text-white hover:bg-white/10 rounded-xs"
+            className="lg:hidden p-1.5 text-ivory/80 hover:text-white hover:bg-white/10 rounded-xs flex-shrink-0"
             aria-label="Toggle menu"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center space-x-2">
-              <span className="font-serif text-base sm:text-lg font-semibold tracking-wide text-white">
+              <span className="font-serif text-sm sm:text-base md:text-lg font-semibold tracking-wide text-white truncate max-w-[140px] xs:max-w-[180px] sm:max-w-xs md:max-w-none">
                 {getPageTitle()}
               </span>
-              <span className="hidden sm:inline-flex items-center gap-1 bg-forest/80 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider text-white">
+              <span className="hidden sm:inline-flex items-center gap-1 bg-forest/80 px-2 py-0.5 rounded text-[10px] font-mono uppercase tracking-wider text-white flex-shrink-0">
                 <ShieldCheck className="w-3 h-3" />
                 <span>Active Portal</span>
               </span>
             </div>
-            <p className="text-[11px] text-ivory/60 hidden sm:block">
+            <p className="text-[11px] text-ivory/60 hidden sm:block truncate">
               Connected to live commerce database & inventory engine
             </p>
           </div>

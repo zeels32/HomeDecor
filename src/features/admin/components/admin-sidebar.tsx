@@ -13,6 +13,7 @@ import {
   Settings,
   Store,
   ArrowLeft,
+  X,
 } from 'lucide-react';
 import { useAdmin } from '../admin-context';
 
@@ -92,6 +93,15 @@ export function AdminSidebar({ isMobileOpen = false, onCloseMobile }: AdminSideb
             Atelier Backoffice
           </span>
         </div>
+        {onCloseMobile && (
+          <button
+            onClick={onCloseMobile}
+            className="lg:hidden p-1.5 text-muted-gray hover:text-charcoal rounded-full hover:bg-sand/40 transition-colors"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav List */}

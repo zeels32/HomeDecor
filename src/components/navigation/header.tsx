@@ -182,14 +182,14 @@ export function Header() {
     });
   }, [dbCategories]);
 
-  // Strictly limit visible collections in the menu bar to at most 5:
+  // Strictly limit visible collections in the menu bar to at most 3:
   const visibleCollections = useMemo(() => {
-    return allCollections.slice(0, 5);
+    return allCollections.slice(0, 3);
   }, [allCollections]);
 
-  // Remaining collections (from index 5 onwards) will be shown inside "More":
+  // Remaining collections (from index 3 onwards) will be shown inside "More":
   const remainingCollections = useMemo(() => {
-    return allCollections.slice(5);
+    return allCollections.slice(3);
   }, [allCollections]);
 
   // Close menus on route change
@@ -290,7 +290,7 @@ export function Header() {
             </div>
 
             {/* Brand Logo - Left-aligned on desktop, flex-shrink-0 so it never collapses */}
-            <div className="flex-1 lg:flex-none flex-shrink-0 flex items-center justify-center lg:justify-start">
+            <div className="flex-1 lg:flex-none flex-shrink-0 flex items-center justify-center lg:justify-start pr-2 xl:pr-6">
               <Link
                 href="/"
                 className="group flex flex-col items-center lg:items-start text-center lg:text-left py-1"
@@ -304,8 +304,8 @@ export function Header() {
               </Link>
             </div>
 
-            {/* Desktop / Laptop Navigation Bar (Bounded width and gap so right icons never overflow) */}
-            <nav className="hidden lg:flex items-center justify-center flex-1 min-w-0 lg:gap-2 xl:gap-3.5 2xl:gap-5 px-1 xl:px-2">
+            {/* Desktop / Laptop Navigation Bar (Limit 3 collections + Shop All + More) */}
+            <nav className="hidden lg:flex items-center justify-center flex-1 min-w-0 lg:gap-3 xl:gap-5 2xl:gap-7 px-2">
               {/* Shop All */}
               <div className="relative py-6 xl:py-7 flex-shrink-0">
                 <Link
@@ -320,7 +320,7 @@ export function Header() {
                 </Link>
               </div>
 
-              {/* Up to 5 Collections */}
+              {/* Up to 3 Collections */}
               {visibleCollections.map((item) => (
                 <div
                   key={item.name}
@@ -519,8 +519,8 @@ export function Header() {
             </nav>
 
             {/* Right Action Icons: Search (Desktop), Account, Wishlist, Cart */}
-            {/* flex-shrink-0 and z-10 ensures it is ALWAYS visible and never pushed off-screen */}
-            <div className="flex items-center space-x-1 sm:space-x-1.5 lg:space-x-2 flex-shrink-0 z-10">
+            {/* flex-shrink-0, pl-2, and z-10 ensures it is ALWAYS visible and never overlapped */}
+            <div className="flex items-center space-x-1 sm:space-x-1.5 lg:space-x-2 flex-shrink-0 pl-2 xl:pl-4 z-10">
               {/* Search Icon (Desktop only, as mobile has it in left group) */}
               <button
                 type="button"

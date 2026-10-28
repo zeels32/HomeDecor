@@ -9,7 +9,9 @@ import {
   ShieldAlert,
   UserCheck,
   UserX,
-  Eye,
+  UserPlus,
+  Key,
+  RefreshCw,
   Mail,
   Phone,
   Calendar,
@@ -17,18 +19,55 @@ import {
   ShoppingCart,
   X,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import { useAdmin } from '../admin-context';
-import { AdminUser } from '../types';
+import { AdminUser, UserCreateFormData } from '../types';
 import { formatCurrency } from '@/lib/pricing';
 
 export function AdminUsersView() {
-  const { users, orders, updateUserRole, isSaving } = useAdmin();
+  const { users, orders, createUser, updateUserRole, isSaving } = useAdmin();
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'customer'>('all');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [roleConfirm, setRoleConfirm] = useState<{ user: AdminUser; newRole: boolean } | null>(null);
+
+  // Add User / Admin Facility Modal State
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [addUserForm, setAddUserForm] = useState<UserCreateFormData>({
+    full_name: '',
+    email: '',
+    password: '',
+    phone: '',
+    is_admin: true, // Default to true when adding from the Admin Users panel
+  });
+
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+    let pass = '';
+    for (let i = 0; i < 12; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setAddUserForm((prev) => ({ ...prev, password: pass }));
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addUserForm.email || !addUserForm.password || !addUserForm.full_name) return;
+
+    const ok = await createUser(addUserForm);
+    if (ok) {
+      setIsAddUserModalOpen(false);
+      setAddUserForm({
+        full_name: '',
+        email: '',
+        password: '',
+        phone: '',
+        is_admin: true,
+      });
+    }
+  };
 
   const filteredUsers = users.filter((u) => {
     const q = search.toLowerCase();
@@ -59,7 +98,6 @@ export function AdminUsersView() {
     }
   };
 
-  // Find customer's orders
   const getUserOrders = (user: AdminUser) => {
     return orders.filter(
       (o) => o.user_id === user.id || o.email?.toLowerCase() === user.email.toLowerCase()
@@ -72,12 +110,24 @@ export function AdminUsersView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-2xl font-semibold text-charcoal">
-            Customers & Personnel
+            Customers & Personnel Management
           </h1>
           <p className="text-xs text-muted-gray mt-0.5">
-            Manage customer profiles, order history, lifetime spend, and staff administrator permissions.
+            Manage authorized staff, invite new administrators, inspect customer profiles and order histories.
           </p>
         </div>
+
+        {/* Facility to Add User for Admin Panel Access */}
+        <button
+          onClick={() => {
+            generatePassword();
+            setIsAddUserModalOpen(true);
+          }}
+          className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-forest hover:bg-forest-light text-white text-xs font-semibold rounded-xs transition-colors shadow-xs self-start sm:self-auto"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Add Admin User</span>
+        </button>
       </div>
 
       {/* Metrics Row */}
@@ -88,7 +138,7 @@ export function AdminUsersView() {
           </div>
           <div>
             <p className="text-2xl font-serif font-semibold text-charcoal">{users.length}</p>
-            <p className="text-xs text-muted-gray">Total Customer Accounts</p>
+            <p className="text-xs text-muted-gray">Total Registered Accounts</p>
           </div>
         </div>
 
@@ -100,7 +150,7 @@ export function AdminUsersView() {
             <p className="text-2xl font-serif font-semibold text-charcoal">
               {users.filter((u) => u.is_admin).length}
             </p>
-            <p className="text-xs text-muted-gray">Designated Administrators</p>
+            <p className="text-xs text-muted-gray">Authorized Administrators</p>
           </div>
         </div>
 
@@ -112,7 +162,7 @@ export function AdminUsersView() {
             <p className="text-2xl font-serif font-semibold text-charcoal">
               {users.filter((u) => u.orders_count > 0).length}
             </p>
-            <p className="text-xs text-muted-gray">Active Purchasing Customers</p>
+            <p className="text-xs text-muted-gray">Purchasing Customers</p>
           </div>
         </div>
       </div>
@@ -145,9 +195,9 @@ export function AdminUsersView() {
             onChange={(e) => setRoleFilter(e.target.value as any)}
             className="px-2.5 py-1.5 bg-white border border-subtle-border rounded-xs text-xs text-charcoal focus:outline-none focus:border-forest"
           >
-            <option value="all">All Accounts</option>
-            <option value="admin">Administrators Only</option>
-            <option value="customer">Customers Only</option>
+            <option value="all">All Accounts ({users.length})</option>
+            <option value="admin">Administrators Only ({users.filter((u) => u.is_admin).length})</option>
+            <option value="customer">Customers Only ({users.filter((u) => !u.is_admin).length})</option>
           </select>
         </div>
       </div>
@@ -158,9 +208,9 @@ export function AdminUsersView() {
           <table className="w-full text-left text-xs">
             <thead className="bg-sand-50/70 border-b border-subtle-border text-[11px] font-semibold text-charcoal uppercase tracking-wider">
               <tr>
-                <th className="p-3.5">Customer / Personnel</th>
+                <th className="p-3.5">User / Personnel</th>
                 <th className="p-3.5">Contact Details</th>
-                <th className="p-3.5">Role</th>
+                <th className="p-3.5">Role & Access</th>
                 <th className="p-3.5">Orders Placed</th>
                 <th className="p-3.5">Lifetime Spend</th>
                 <th className="p-3.5">Member Since</th>
@@ -179,7 +229,11 @@ export function AdminUsersView() {
                       {/* Name & Avatar */}
                       <td className="p-3.5">
                         <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 rounded-full bg-forest text-white font-serif font-semibold text-xs flex items-center justify-center flex-shrink-0">
+                          <div
+                            className={`w-8 h-8 rounded-full font-serif font-semibold text-xs flex items-center justify-center flex-shrink-0 ${
+                              u.is_admin ? 'bg-forest text-white' : 'bg-sand-200 text-charcoal'
+                            }`}
+                          >
                             {initials}
                           </div>
                           <div>
@@ -201,11 +255,11 @@ export function AdminUsersView() {
                         {u.is_admin ? (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-forest-50 text-forest border border-forest-200">
                             <ShieldCheck className="w-3 h-3" />
-                            <span>Administrator</span>
+                            <span>Administrator (Full Backoffice Access)</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sand-100 text-charcoal border border-subtle-border">
-                            <span>Customer</span>
+                            <span>Standard Customer</span>
                           </span>
                         )}
                       </td>
@@ -242,18 +296,14 @@ export function AdminUsersView() {
                             onClick={() =>
                               setRoleConfirm({ user: u, newRole: !u.is_admin })
                             }
-                            title={u.is_admin ? 'Demote to Customer' : 'Promote to Admin'}
-                            className={`p-1.5 rounded-xs transition-colors ${
+                            title={u.is_admin ? 'Revoke Admin Privileges' : 'Promote to Administrator'}
+                            className={`px-2 py-1 rounded-xs border text-[11px] font-semibold transition-colors ${
                               u.is_admin
-                                ? 'text-amber-600 hover:bg-amber-50'
-                                : 'text-forest hover:bg-forest-50'
+                                ? 'border-amber-200 text-amber-800 bg-amber-50 hover:bg-amber-100'
+                                : 'border-forest/30 text-forest bg-forest-50 hover:bg-forest-100'
                             }`}
                           >
-                            {u.is_admin ? (
-                              <UserX className="w-3.5 h-3.5" />
-                            ) : (
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                            )}
+                            {u.is_admin ? 'Demote' : 'Promote to Admin'}
                           </button>
                         </div>
                       </td>
@@ -263,7 +313,7 @@ export function AdminUsersView() {
               ) : (
                 <tr>
                   <td colSpan={7} className="p-10 text-center text-xs text-muted-gray">
-                    No customers found matching current filters.
+                    No users found matching current filters.
                   </td>
                 </tr>
               )}
@@ -276,6 +326,167 @@ export function AdminUsersView() {
           Showing {filteredUsers.length} of {users.length} accounts
         </div>
       </div>
+
+      {/* FACILITY: Add New User / Administrator Modal */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/70 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-sm border border-subtle-border shadow-elevated w-full max-w-lg my-8 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-subtle-border bg-sand-50/70 flex items-center justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-full bg-forest text-white flex items-center justify-center">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif text-lg font-semibold text-charcoal">
+                    Add User for Backoffice / Store Access
+                  </h3>
+                  <p className="text-xs text-muted-gray">
+                    Register a new administrator or customer account with instant authentication.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddUserModalOpen(false)}
+                className="p-1.5 text-muted-gray hover:text-charcoal rounded-xs"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-semibold text-charcoal">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={addUserForm.full_name}
+                  onChange={(e) =>
+                    setAddUserForm({ ...addUserForm, full_name: e.target.value })
+                  }
+                  placeholder="e.g. Elena Rostova"
+                  className="w-full p-2 bg-ivory border border-subtle-border rounded-xs focus:outline-none focus:border-forest"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-charcoal">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={addUserForm.email}
+                  onChange={(e) =>
+                    setAddUserForm({ ...addUserForm, email: e.target.value })
+                  }
+                  placeholder="e.g. staff@terraandform.com"
+                  className="w-full p-2 bg-ivory border border-subtle-border rounded-xs focus:outline-none focus:border-forest"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="font-semibold text-charcoal">Password *</label>
+                  <button
+                    type="button"
+                    onClick={generatePassword}
+                    className="text-[11px] text-forest hover:underline flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Generate Strong Password</span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    value={addUserForm.password}
+                    onChange={(e) =>
+                      setAddUserForm({ ...addUserForm, password: e.target.value })
+                    }
+                    placeholder="Minimum 6 characters"
+                    className="w-full pl-8 pr-3 py-2 bg-ivory border border-subtle-border rounded-xs font-mono focus:outline-none focus:border-forest"
+                  />
+                  <Key className="w-3.5 h-3.5 text-muted-gray absolute left-2.5 top-2.5" />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-charcoal">Telephone (Optional)</label>
+                <input
+                  type="tel"
+                  value={addUserForm.phone || ''}
+                  onChange={(e) =>
+                    setAddUserForm({ ...addUserForm, phone: e.target.value })
+                  }
+                  placeholder="+91 98765 43210"
+                  className="w-full p-2 bg-ivory border border-subtle-border rounded-xs focus:outline-none focus:border-forest"
+                />
+              </div>
+
+              {/* Role selection radio / toggle */}
+              <div className="p-3.5 bg-sand-50/70 border border-subtle-border rounded-xs space-y-2">
+                <label className="font-semibold text-charcoal block">
+                  Select Account Role & Permissions
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-start space-x-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      checked={addUserForm.is_admin}
+                      onChange={() => setAddUserForm({ ...addUserForm, is_admin: true })}
+                      className="mt-0.5 text-forest focus:ring-forest"
+                    />
+                    <div>
+                      <span className="font-semibold text-charcoal block">
+                        Administrator (Full Backoffice Portal Access)
+                      </span>
+                      <span className="text-[11px] text-muted-gray">
+                        Allows managing products, fulfilling orders, editing pricing, and moderating content.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start space-x-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      checked={!addUserForm.is_admin}
+                      onChange={() => setAddUserForm({ ...addUserForm, is_admin: false })}
+                      className="mt-0.5 text-forest focus:ring-forest"
+                    />
+                    <div>
+                      <span className="font-semibold text-charcoal block">
+                        Standard Customer Account
+                      </span>
+                      <span className="text-[11px] text-muted-gray">
+                        Limited to store browsing, shopping cart, and personal account dashboard.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-subtle-border flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddUserModalOpen(false)}
+                  className="px-4 py-2 border border-subtle-border rounded-xs text-charcoal hover:bg-sand-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2 bg-forest hover:bg-forest-light text-white font-semibold rounded-xs transition-colors shadow-xs"
+                >
+                  {isSaving ? 'Creating User...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Role Switch Confirmation Modal */}
       {roleConfirm && (
@@ -318,7 +529,7 @@ export function AdminUsersView() {
             <div className="p-5 border-b border-subtle-border bg-sand-50/70 flex items-center justify-between">
               <div>
                 <h3 className="font-serif text-lg font-semibold text-charcoal">
-                  Customer Profile: {selectedUser.full_name || selectedUser.email}
+                  Account Dossier: {selectedUser.full_name || selectedUser.email}
                 </h3>
                 <p className="text-xs text-muted-gray">{selectedUser.email}</p>
               </div>
@@ -430,7 +641,7 @@ export function AdminUsersView() {
                   </div>
                 ) : (
                   <p className="text-muted-gray p-4 bg-sand-50/30 rounded-xs text-center">
-                    No orders have been placed by this customer yet.
+                    No orders have been placed by this account yet.
                   </p>
                 )}
               </div>
@@ -448,7 +659,7 @@ export function AdminUsersView() {
                     : 'border-forest text-forest bg-forest-50 hover:bg-forest-100'
                 }`}
               >
-                {selectedUser.is_admin ? 'Revoke Admin Privileges' : 'Promote to Administrator'}
+                {selectedUser.is_admin ? 'Revoke Administrator Access' : 'Promote to Administrator'}
               </button>
 
               <button

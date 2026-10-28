@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
+import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
 
 const DEFAULT_SETTINGS = {
   brand_info: {
@@ -20,7 +21,10 @@ const DEFAULT_SETTINGS = {
   },
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -44,6 +48,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -51,7 +58,6 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-
     const keys = ['brand_info', 'shipping_policy', 'announcement'];
     const now = new Date().toISOString();
 

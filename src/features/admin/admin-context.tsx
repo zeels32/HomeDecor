@@ -11,6 +11,7 @@ import {
   StoreSettings,
   ProductFormData,
   CategoryFormData,
+  UserCreateFormData,
 } from './types';
 import { AdminService } from './admin-service';
 
@@ -64,6 +65,7 @@ interface AdminContextType {
   updatePaymentStatus: (id: string, payment_status: AdminOrder['payment_status']) => Promise<boolean>;
 
   // Users & Staff
+  createUser: (data: UserCreateFormData) => Promise<boolean>;
   updateUserRole: (userId: string, is_admin: boolean) => Promise<boolean>;
 
   // Categories CRUD
@@ -130,7 +132,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Compute local stats fallback if needed
   const computeStatsFallback = (prods: AdminProduct[], ords: AdminOrder[]): AdminStats => {
     const totalRev = ords
       .filter((o) => o.status !== 'cancelled')
@@ -253,7 +254,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   const updateStock = async (id: string, newStock: number) => {
     const valid = Math.max(0, newStock);
-    // Optimistic update
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, stock_quantity: valid } : p))
     );
@@ -287,7 +287,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     status: AdminOrder['status']
   ): Promise<boolean> => {
     setIsSaving(true);
-    // Optimistic update
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
     try {
       await AdminService.updateOrderStatus(id, status);
@@ -308,7 +307,6 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     payment_status: AdminOrder['payment_status']
   ): Promise<boolean> => {
     setIsSaving(true);
-    // Optimistic update
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, payment_status } : o)));
     try {
       await AdminService.updatePaymentStatus(id, payment_status);
@@ -324,7 +322,23 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Users
+  // Users & Staff
+  const createUser = async (data: UserCreateFormData): Promise<boolean> => {
+    setIsSaving(true);
+    try {
+      const created = await AdminService.createUser(data);
+      setUsers((prev) => [created, ...prev]);
+      showToast(`Account "${created.full_name}" created with ${created.is_admin ? 'Admin' : 'Customer'} role`);
+      await refreshAll();
+      return true;
+    } catch (err: any) {
+      showToast(err.message || 'Failed to create user account', 'error');
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const updateUserRole = async (userId: string, is_admin: boolean): Promise<boolean> => {
     setIsSaving(true);
     try {
@@ -524,6 +538,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         deleteProduct,
         updateOrderStatus,
         updatePaymentStatus,
+        createUser,
         updateUserRole,
         createCategory,
         updateCategory,

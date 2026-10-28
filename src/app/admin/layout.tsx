@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AdminProvider, AdminShell } from '@/features/admin';
+import { AdminProvider, AdminShell, AdminGuard } from '@/features/admin';
 
 export default function AdminLayout({
   children,
@@ -9,8 +9,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AdminProvider>
-      <AdminShell>{children}</AdminShell>
-    </AdminProvider>
+    <AdminGuard>
+      <AdminProvider>
+        <AdminShell>{children}</AdminShell>
+      </AdminProvider>
+    </AdminGuard>
   );
 }

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
+import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -24,7 +28,6 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Format products
     const formatted = (data || []).map((raw: any) => ({
       ...raw,
       base_price: Number(raw.base_price),
@@ -53,6 +56,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -68,7 +74,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate slug if not provided
     const slug = (body.slug || body.name)
       .toLowerCase()
       .replace(/[^\w\s-]/g, '')
@@ -112,7 +117,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: prodError?.message || 'Failed to create product' }, { status: 500 });
     }
 
-    // Insert images if provided
     if (Array.isArray(body.images) && body.images.length > 0) {
       const imageRows = body.images.map((img: any, idx: number) => ({
         product_id: createdProduct.id,

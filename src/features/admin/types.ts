@@ -120,3 +120,12 @@ export interface CategoryFormData {
   sort_order: number;
   is_active: boolean;
 }
+
+
+export interface UserCreateFormData {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  is_admin: boolean;
+}

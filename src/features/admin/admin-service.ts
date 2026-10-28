@@ -8,15 +8,41 @@ import {
   StoreSettings,
   ProductFormData,
   CategoryFormData,
+  UserCreateFormData,
 } from './types';
+import { createClient } from '@/lib/supabase/client';
 
 export class AdminService {
+  /**
+   * Helper to retrieve auth headers with Bearer token if available
+   */
+  private static async getHeaders(): Promise<HeadersInit> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    try {
+      const supabase = createClient();
+      if (supabase) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+    } catch {
+      // Browser cookies will handle authentication
+    }
+    return headers;
+  }
+
   /**
    * Fetch all products
    */
   static async getProducts(): Promise<AdminProduct[]> {
     try {
-      const res = await fetch('/api/admin/products', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/products', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch products');
       const data = await res.json();
       return data.products || [];
@@ -30,9 +56,10 @@ export class AdminService {
    * Create new product
    */
   static async createProduct(formData: ProductFormData): Promise<AdminProduct> {
+    const headers = await this.getHeaders();
     const res = await fetch('/api/admin/products', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(formData),
     });
     if (!res.ok) {
@@ -47,9 +74,10 @@ export class AdminService {
    * Update existing product
    */
   static async updateProduct(id: string, formData: Partial<ProductFormData>): Promise<AdminProduct> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/products/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(formData),
     });
     if (!res.ok) {
@@ -64,9 +92,10 @@ export class AdminService {
    * Update quick stock
    */
   static async updateStock(id: string, newStock: number): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/products/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ stock_quantity: Math.max(0, newStock) }),
     });
     if (!res.ok) {
@@ -79,8 +108,10 @@ export class AdminService {
    * Delete product
    */
   static async deleteProduct(id: string): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/products/${id}`, {
       method: 'DELETE',
+      headers,
     });
     if (!res.ok) {
       const err = await res.json();
@@ -93,7 +124,8 @@ export class AdminService {
    */
   static async getOrders(): Promise<AdminOrder[]> {
     try {
-      const res = await fetch('/api/admin/orders', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/orders', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch orders');
       const data = await res.json();
       return data.orders || [];
@@ -110,9 +142,10 @@ export class AdminService {
     orderId: string,
     status: AdminOrder['status']
   ): Promise<AdminOrder> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/orders/${orderId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ status }),
     });
     if (!res.ok) {
@@ -130,9 +163,10 @@ export class AdminService {
     orderId: string,
     payment_status: AdminOrder['payment_status']
   ): Promise<AdminOrder> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/orders/${orderId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ payment_status }),
     });
     if (!res.ok) {
@@ -148,7 +182,8 @@ export class AdminService {
    */
   static async getUsers(): Promise<AdminUser[]> {
     try {
-      const res = await fetch('/api/admin/users', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/users', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch users');
       const data = await res.json();
       return data.users || [];
@@ -159,15 +194,34 @@ export class AdminService {
   }
 
   /**
+   * Facility: Create new user or administrator
+   */
+  static async createUser(formData: UserCreateFormData): Promise<AdminUser> {
+    const headers = await this.getHeaders();
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(formData),
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to create user');
+    }
+    const data = await res.json();
+    return data.user;
+  }
+
+  /**
    * Update user role / profile
    */
   static async updateUser(
     userId: string,
     payload: { is_admin?: boolean; full_name?: string; phone?: string }
   ): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch('/api/admin/users', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ userId, ...payload }),
     });
     if (!res.ok) {
@@ -181,7 +235,8 @@ export class AdminService {
    */
   static async getCategories(): Promise<AdminCategory[]> {
     try {
-      const res = await fetch('/api/admin/categories', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/categories', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch categories');
       const data = await res.json();
       return data.categories || [];
@@ -195,9 +250,10 @@ export class AdminService {
    * Create category
    */
   static async createCategory(formData: CategoryFormData): Promise<AdminCategory> {
+    const headers = await this.getHeaders();
     const res = await fetch('/api/admin/categories', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(formData),
     });
     if (!res.ok) {
@@ -215,9 +271,10 @@ export class AdminService {
     id: string,
     formData: Partial<CategoryFormData>
   ): Promise<AdminCategory> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/categories/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(formData),
     });
     if (!res.ok) {
@@ -232,8 +289,10 @@ export class AdminService {
    * Delete category
    */
   static async deleteCategory(id: string): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/categories/${id}`, {
       method: 'DELETE',
+      headers,
     });
     if (!res.ok) {
       const err = await res.json();
@@ -246,7 +305,8 @@ export class AdminService {
    */
   static async getReviews(): Promise<AdminReview[]> {
     try {
-      const res = await fetch('/api/admin/reviews', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/reviews', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch reviews');
       const data = await res.json();
       return data.reviews || [];
@@ -260,9 +320,10 @@ export class AdminService {
    * Toggle review publish status
    */
   static async toggleReviewPublish(id: string, is_published: boolean): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/reviews/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ is_published }),
     });
     if (!res.ok) {
@@ -275,8 +336,10 @@ export class AdminService {
    * Delete review
    */
   static async deleteReview(id: string): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch(`/api/admin/reviews/${id}`, {
       method: 'DELETE',
+      headers,
     });
     if (!res.ok) {
       const err = await res.json();
@@ -289,7 +352,8 @@ export class AdminService {
    */
   static async getSettings(): Promise<StoreSettings> {
     try {
-      const res = await fetch('/api/admin/settings', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/settings', { headers, cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch settings');
       const data = await res.json();
       return data.settings;
@@ -319,9 +383,10 @@ export class AdminService {
    * Save site settings
    */
   static async updateSettings(settings: StoreSettings): Promise<void> {
+    const headers = await this.getHeaders();
     const res = await fetch('/api/admin/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(settings),
     });
     if (!res.ok) {
@@ -335,7 +400,8 @@ export class AdminService {
    */
   static async getStats(): Promise<AdminStats | null> {
     try {
-      const res = await fetch('/api/admin/stats', { cache: 'no-store' });
+      const headers = await this.getHeaders();
+      const res = await fetch('/api/admin/stats', { headers, cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       return data.stats;

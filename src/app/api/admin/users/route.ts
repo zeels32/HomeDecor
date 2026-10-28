@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
+import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabaseAdmin = getAdminClient();
     const fallbackSupabase = getPublicSupabase();
@@ -22,7 +26,7 @@ export async function GET() {
       console.warn('Profiles query error:', profError);
     }
 
-    // 2. Fetch auth users if admin client is available
+    // 2. Fetch auth users via admin client
     let authUsers: any[] = [];
     if (supabaseAdmin?.auth?.admin) {
       try {
@@ -42,13 +46,11 @@ export async function GET() {
 
     const ordersList = orders || [];
 
-    // Map profiles by ID
     const profilesMap = new Map<string, any>();
     (profiles || []).forEach((p: any) => {
       profilesMap.set(p.id, p);
     });
 
-    // Combined user list
     const combinedMap = new Map<string, any>();
 
     // Add all auth users
@@ -86,7 +88,7 @@ export async function GET() {
       }
     });
 
-    // Also collect any unique customers from orders (e.g. guests)
+    // Aggregate orders
     ordersList.forEach((o: any) => {
       if (o.user_id && combinedMap.has(o.user_id)) {
         const u = combinedMap.get(o.user_id);
@@ -96,7 +98,6 @@ export async function GET() {
           u.last_order_date = o.created_at;
         }
       } else if (o.email) {
-        // Find by email or add guest user
         let found = Array.from(combinedMap.values()).find(
           (u) => u.email.toLowerCase() === o.email.toLowerCase()
         );
@@ -106,19 +107,6 @@ export async function GET() {
           if (!found.last_order_date || new Date(o.created_at) > new Date(found.last_order_date)) {
             found.last_order_date = o.created_at;
           }
-        } else {
-          combinedMap.set(`order_cust_${o.email}`, {
-            id: o.user_id || `guest_${o.email}`,
-            email: o.email,
-            full_name: o.email.split('@')[0],
-            phone: null,
-            avatar_url: null,
-            is_admin: false,
-            created_at: o.created_at,
-            orders_count: 1,
-            total_spend: Number(o.total_amount || 0),
-            last_order_date: o.created_at,
-          });
         }
       }
     });
@@ -133,9 +121,109 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: Request) {
+/**
+ * Facility to add a new user or administrator directly from the backoffice
+ */
+export async function POST(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
-    const supabase = getAdminClient() || getPublicSupabase();
+    const supabaseAdmin = getAdminClient();
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Admin service client unavailable' },
+        { status: 500 }
+      );
+    }
+
+    const body = await request.json();
+    const { email, password, full_name, phone, is_admin } = body;
+
+    if (!email || !password || !full_name) {
+      return NextResponse.json(
+        { error: 'Email, password, and full name are required.' },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6) {
+      return NextResponse.json(
+        { error: 'Password must be at least 6 characters long.' },
+        { status: 400 }
+      );
+    }
+
+    // 1. Create the user in Supabase Auth
+    const { data: createdAuthUser, error: authError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email: email.toLowerCase().trim(),
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name,
+        },
+      });
+
+    if (authError || !createdAuthUser.user) {
+      return NextResponse.json(
+        { error: authError?.message || 'Failed to create user account' },
+        { status: 400 }
+      );
+    }
+
+    const userId = createdAuthUser.user.id;
+
+    // 2. Upsert profile with designated role
+    const { data: profile, error: profError } = await (supabaseAdmin as any)
+      .from('profiles')
+      .upsert({
+        id: userId,
+        full_name,
+        phone: phone || null,
+        is_admin: is_admin !== undefined ? Boolean(is_admin) : true, // default to admin when added from admin panel
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (profError) {
+      console.warn('Profile creation warning:', profError);
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: userId,
+          email: createdAuthUser.user.email,
+          full_name,
+          phone: phone || null,
+          is_admin: is_admin !== undefined ? Boolean(is_admin) : true,
+          created_at: createdAuthUser.user.created_at,
+          orders_count: 0,
+          total_spend: 0,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });
+  }
+}
+
+/**
+ * Update an existing user role or profile attributes
+ */
+export async function PATCH(request: Request) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
+  try {
+    const supabaseAdmin = getAdminClient();
+    const fallbackSupabase = getPublicSupabase();
+    const supabase = supabaseAdmin || fallbackSupabase;
+
     if (!supabase) {
       return NextResponse.json({ error: 'Supabase client unavailable' }, { status: 500 });
     }
@@ -154,7 +242,6 @@ export async function PATCH(request: Request) {
     if (full_name !== undefined) updatePayload.full_name = full_name;
     if (phone !== undefined) updatePayload.phone = phone;
 
-    // Upsert into profiles
     const { data, error } = await (supabase as any)
       .from('profiles')
       .upsert({ id: userId, ...updatePayload })

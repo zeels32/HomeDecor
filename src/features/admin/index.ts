@@ -1,6 +1,7 @@
 export * from './types';
 export * from './admin-service';
 export * from './admin-context';
+export * from './components/admin-guard';
 export * from './components/admin-shell';
 export * from './components/admin-header';
 export * from './components/admin-sidebar';

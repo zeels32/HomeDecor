@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
+import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
 
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -52,7 +56,6 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // If images are provided in update, sync product_images
     if (Array.isArray(body.images)) {
       await (supabase as any).from('product_images').delete().eq('product_id', productId);
 
@@ -75,9 +78,12 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
+  const auth = await verifyAdminRequest(request);
+  if (!auth.authorized) return auth.errorResponse!;
+
   try {
     const supabase = getAdminClient() || getPublicSupabase();
     if (!supabase) {
@@ -85,8 +91,6 @@ export async function DELETE(
     }
 
     const productId = params.id;
-
-    // Delete product
     const { error } = await supabase.from('products').delete().eq('id', productId);
 
     if (error) {

@@ -13,6 +13,7 @@ import {
   X,
   ChevronDown,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 import { useCart } from '@/features/cart/cart-context';
 import { useWishlist } from '@/features/wishlist/wishlist-context';
@@ -23,7 +24,7 @@ export function Header() {
   const pathname = usePathname();
   const { itemCount, openDrawer } = useCart();
   const { wishlistCount } = useWishlist();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -201,6 +202,18 @@ export function Header() {
               >
                 <User className="w-5 h-5" />
               </Link>
+
+              {profile?.is_admin && (
+                <Link
+                  href="/admin"
+                  className="p-2 text-forest hover:text-forest-dark transition-colors rounded-full hover:bg-forest-50 relative"
+                  title="Admin Backoffice"
+                  aria-label="Admin Backoffice"
+                >
+                  <ShieldCheck className="w-5 h-5" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-forest rounded-full" />
+                </Link>
+              )}
 
               <Link
                 href="/wishlist"

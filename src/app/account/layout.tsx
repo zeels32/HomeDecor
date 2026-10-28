@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { User, Package, MapPin, Heart, LogOut } from 'lucide-react';
+import { User, Package, MapPin, Heart, LogOut, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/features/auth/auth-context';
 
 export default function AccountLayout({
@@ -27,6 +27,14 @@ export default function AccountLayout({
     { name: 'Profile Settings', href: '/account/profile', icon: User },
     { name: 'Wishlist', href: '/wishlist', icon: Heart },
   ];
+
+  if (profile?.is_admin) {
+    navLinks.push({
+      name: 'Admin Backoffice',
+      href: '/admin',
+      icon: ShieldCheck,
+    });
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

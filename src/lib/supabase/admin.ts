@@ -14,5 +14,12 @@ export function getAdminClient() {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: {
+      fetch: (url, init) =>
+        fetch(url, {
+          ...init,
+          cache: 'no-store',
+        }),
+    },
   });
 }

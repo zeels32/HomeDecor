@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
 import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
       await (supabase as any).from('product_images').insert(imageRows);
     }
 
+    try { revalidatePath('/shop'); revalidatePath('/'); revalidatePath('/collections/[slug]', 'page'); revalidatePath('/product/[slug]', 'page'); revalidatePath('/search'); } catch(e){} 
     return NextResponse.json({ product: createdProduct }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });

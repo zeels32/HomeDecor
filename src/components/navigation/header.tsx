@@ -22,6 +22,9 @@ import {
 import { useCart } from '@/features/cart/cart-context';
 import { useWishlist } from '@/features/wishlist/wishlist-context';
 import { useAuth } from '@/features/auth/auth-context';
+import { createClient } from '@/lib/supabase/client';
+import { Category } from '@/types';
+import { useMemo } from 'react';
 import { SearchModal } from './search-modal';
 
 interface SubCategory {
@@ -54,6 +57,34 @@ export function Header() {
     'Flower Pots': true, // Open first category by default for discoverability
   });
   const [isScrolled, setIsScrolled] = useState(false);
+  const [dbCategories, setDbCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) return;
+
+    supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        if (data) {
+          setDbCategories(data as Category[]);
+        }
+      });
+  }, [pathname]);
+
+  const extraCategories = useMemo(() => {
+    const defaultSlugs = new Set([
+      'flower-pots',
+      'flower-vases',
+      'tabletop-decor',
+      'living-room',
+      'office-decor',
+    ]);
+    return dbCategories.filter((cat) => !defaultSlugs.has(cat.slug));
+  }, [dbCategories]);
 
   // Close menus on route change
   useEffect(() => {
@@ -333,6 +364,45 @@ export function Header() {
                   )}
                 </div>
               ))}
+
+              {extraCategories.length > 0 && (
+                <div
+                  className="relative py-6 xl:py-7 group"
+                  onMouseEnter={() => setActiveMegaDropdown('More Collections')}
+                  onMouseLeave={() => setActiveMegaDropdown(null)}
+                >
+                  <button
+                    type="button"
+                    className="text-[11.5px] xl:text-[12.5px] 2xl:text-[13px] tracking-wider uppercase font-medium transition-colors inline-flex items-center gap-1 whitespace-nowrap py-1 text-charcoal hover:text-forest"
+                  >
+                    <span>More</span>
+                    <ChevronDown
+                      className={`w-3 h-3 text-muted-gray transition-transform duration-200 ${
+                        activeMegaDropdown === 'More Collections' ? 'rotate-180 text-forest' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {activeMegaDropdown === 'More Collections' && (
+                    <div className="absolute top-full right-0 w-52 bg-white border border-subtle-border shadow-elevated rounded-sm p-2.5 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-gray px-2 pb-1.5 border-b border-subtle-border">
+                        More Collections
+                      </p>
+                      <div className="py-1 space-y-0.5">
+                        {extraCategories.map((cat) => (
+                          <Link
+                            key={cat.id}
+                            href={`/collections/${cat.slug}`}
+                            className="block px-2 py-1.5 text-xs text-charcoal hover:text-forest hover:bg-sand/30 rounded-xs transition-colors"
+                          >
+                            {cat.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </nav>
 
             {/* Right Action Icons: Search (Desktop), Account, Wishlist, Cart */}
@@ -562,6 +632,26 @@ export function Header() {
                       </div>
                     );
                   })}
+
+                  {/* Dynamic Extra Categories from Admin */}
+                  {extraCategories.length > 0 && (
+                    <div className="pt-2 border-t border-subtle-border/60 space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-gray px-1 pb-1">
+                        More Collections
+                      </p>
+                      {extraCategories.map((cat) => (
+                        <Link
+                          key={cat.id}
+                          href={`/collections/${cat.slug}`}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="flex items-center justify-between py-2 px-2 text-sm font-serif font-medium text-charcoal hover:text-forest hover:bg-sand/30 rounded-xs transition-colors"
+                        >
+                          <span>{cat.name}</span>
+                          <ArrowRight className="w-3.5 h-3.5 text-muted-gray" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Featured Editorial Card */}

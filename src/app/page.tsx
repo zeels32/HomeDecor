@@ -4,6 +4,10 @@ import { ArrowRight, Sparkles, Compass, Shield, Award } from 'lucide-react';
 import { getFeaturedProducts, getNewArrivals, getCategories } from '@/lib/data/products';
 import { ProductCard } from '@/components/product/product-card';
 
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function HomePage() {
   const [featuredProducts, newArrivals, categories] = await Promise.all([
     getFeaturedProducts(8),

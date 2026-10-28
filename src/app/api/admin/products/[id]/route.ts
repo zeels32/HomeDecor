@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
 import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
@@ -97,6 +98,7 @@ export async function DELETE(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    try { revalidatePath('/shop'); revalidatePath('/'); revalidatePath('/collections/[slug]', 'page'); revalidatePath('/product/[slug]', 'page'); revalidatePath('/search'); } catch(e){} 
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Server error' }, { status: 500 });

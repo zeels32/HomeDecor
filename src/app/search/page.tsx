@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   description: 'Search for ceramic vases, terracotta pots, console stands, and accessories.',
 };
 
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function SearchPage({ searchParams }: Props) {
   const query = searchParams.q || '';
   const [products, categories] = await Promise.all([

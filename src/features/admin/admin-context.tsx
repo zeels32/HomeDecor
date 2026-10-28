@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AdminProduct,
   AdminOrder,
@@ -106,6 +107,7 @@ const defaultSettings: StoreSettings = {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -363,6 +365,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       const created = await AdminService.createCategory(data);
       setCategories((prev) => [...prev, created]);
       showToast(`Category "${created.name}" created`);
+      router.refresh();
       return true;
     } catch (err: any) {
       showToast(err.message || 'Failed to create category', 'error');
@@ -381,6 +384,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       const updated = await AdminService.updateCategory(id, data);
       setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
       showToast(`Category updated`);
+      router.refresh();
       return true;
     } catch (err: any) {
       showToast(err.message || 'Failed to update category', 'error');
@@ -396,6 +400,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       await AdminService.deleteCategory(id);
       setCategories((prev) => prev.filter((c) => c.id !== id));
       showToast('Category deleted');
+      router.refresh();
       return true;
     } catch (err: any) {
       showToast(err.message || 'Failed to delete category', 'error');

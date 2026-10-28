@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
 import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
@@ -80,6 +81,17 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Purge cached storefront paths so new category immediately appears
+    try {
+      revalidatePath('/shop');
+      revalidatePath('/');
+      revalidatePath('/collections/[slug]', 'page');
+      revalidatePath('/search');
+      revalidatePath('/sitemap.xml');
+    } catch (revalErr) {
+      console.warn('Path revalidation warning:', revalErr);
     }
 
     return NextResponse.json({ success: true, category: data }, { status: 201 });

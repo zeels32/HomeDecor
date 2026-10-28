@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getPublicSupabase } from '@/lib/supabase/public';
 import { verifyAdminRequest } from '@/lib/supabase/admin-auth';
+
+function purgeCategoryCache() {
+  try {
+    revalidatePath('/shop');
+    revalidatePath('/');
+    revalidatePath('/collections/[slug]', 'page');
+    revalidatePath('/search');
+    revalidatePath('/sitemap.xml');
+  } catch (err) {
+    console.warn('Path revalidation warning:', err);
+  }
+}
 
 export async function PATCH(
   request: Request,
@@ -37,6 +50,8 @@ export async function PATCH(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    purgeCategoryCache();
 
     return NextResponse.json({ success: true, category: updated });
   } catch (err: any) {
@@ -77,6 +92,8 @@ export async function DELETE(
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    purgeCategoryCache();
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

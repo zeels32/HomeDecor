@@ -14,5 +14,12 @@ export function getPublicSupabase() {
       persistSession: false,
       autoRefreshToken: false,
     },
+    global: {
+      fetch: (url, init) =>
+        fetch(url, {
+          ...init,
+          cache: 'no-store',
+        }),
+    },
   });
 }
